@@ -1,0 +1,56 @@
+name: Daily AI Builders Digest
+
+on:
+  schedule:
+    # 7am GMT+8 = 23:00 UTC (previous day)
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install opencode
+        run: npm install -g opencode-ai
+
+      - name: Clone follow-builders skill
+        run: |
+          git clone https://github.com/zarazhangrui/follow-builders.git .opencode/skills/follow-builders
+          cd .opencode/skills/follow-builders/scripts && npm install
+
+      - name: Set today's date
+        id: date
+        run: echo "today=$(TZ=Asia/Shanghai date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate digest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          CLAUDE_SKILL_DIR: .opencode/skills/follow-builders
+          OPENCODE_PERMISSION: '{"external_directory":"allow"}'
+        run: |
+          opencode run \
+            --model "opencode/minimax-m2.5-free" \
+            "Load the follow-builders skill and run the full Content Delivery workflow. Save the final digest as docs/${{ steps.date.outputs.today }}.md" \
+            2>&1 || true
+
+      - name: Generate index
+        run: node .github/workflows/scripts/generate-index.js
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          git diff --cached --quiet || git commit -m "digest: ${{ steps.date.outputs.today }}"
+          git push
