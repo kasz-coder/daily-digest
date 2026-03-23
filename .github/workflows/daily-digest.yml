@@ -44,8 +44,11 @@ jobs:
             "Load the follow-builders skill and run the full Content Delivery workflow. Save the final digest as docs/${{ steps.date.outputs.today }}.md" \
             2>&1 || true
 
-      - name: Generate index
-        run: node .github/workflows/scripts/generate-index.js
+- name: Convert bare URLs to markdown links
+  run: node .github/workflows/scripts/convert-links.js
+
+- name: Generate index
+  run: node .github/workflows/scripts/generate-index.js
 
       - name: Commit and push
         run: |
